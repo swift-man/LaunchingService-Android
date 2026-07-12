@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added an optional observer for recoverable Firebase Remote Config fetch failures.
+
 ## [0.1.0] - 2026-07-12
 
 ### Added

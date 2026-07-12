@@ -55,6 +55,17 @@ val launchingService = LaunchingService(
 
 `fetchAndActivate()` 네트워크 요청이 실패하면 현재 activated 값, 앱 기본값, Firebase 정적 기본값 순서로 계속 판정합니다. coroutine cancellation은 삼키지 않습니다. Firebase default app 자체가 구성되지 않은 경우 `LaunchingServiceException.FirebaseNotConfigured`가 발생합니다.
 
+캐시 폴백을 유지하면서 네트워크 실패를 진단 시스템에 전달하려면 선택적 관찰자를 사용합니다. 관찰자에서 발생한 예외는 상태 판정을 중단하지 않습니다.
+
+```kotlin
+val launchingService = LaunchingService(
+  context = applicationContext,
+  fetchFailureObserver = RemoteConfigFetchFailureObserver { error ->
+    android.util.Log.w("LaunchingService", "Remote Config fetch failed", error)
+  },
+)
+```
+
 ## Architecture
 
 `launching-service` 모듈은 Compose, ViewModel, Activity, Fragment에 의존하지 않습니다. 화면 구성은 소비 앱의 책임입니다.

@@ -9,6 +9,7 @@ public class LaunchingService internal constructor(
   private val appVersionProvider: AppVersionProvider,
   private val keys: RemoteConfigKeys = RemoteConfigKeys(),
   private val comparator: LaunchingStatusComparator = LaunchingStatusComparator(),
+  private val fetchFailureObserver: RemoteConfigFetchFailureObserver = ignoreFetchFailure,
 ) : LaunchingServiceClient {
   public constructor(
     context: Context,
@@ -22,6 +23,18 @@ public class LaunchingService internal constructor(
 
   public constructor(
     context: Context,
+    fetchFailureObserver: RemoteConfigFetchFailureObserver,
+    keys: RemoteConfigKeys = RemoteConfigKeys(),
+  ) : this(
+    remoteConfigClient = FirebaseRemoteConfigClient(FirebaseRemoteConfig::getInstance),
+    appVersionProvider = PackageManagerAppVersionProvider(context.applicationContext),
+    keys = keys,
+    comparator = LaunchingStatusComparator(),
+    fetchFailureObserver = fetchFailureObserver,
+  )
+
+  public constructor(
+    context: Context,
     remoteConfig: FirebaseRemoteConfig,
     keys: RemoteConfigKeys = RemoteConfigKeys(),
   ) : this(
@@ -31,13 +44,26 @@ public class LaunchingService internal constructor(
     comparator = LaunchingStatusComparator(),
   )
 
+  public constructor(
+    context: Context,
+    remoteConfig: FirebaseRemoteConfig,
+    fetchFailureObserver: RemoteConfigFetchFailureObserver,
+    keys: RemoteConfigKeys = RemoteConfigKeys(),
+  ) : this(
+    remoteConfigClient = FirebaseRemoteConfigClient { remoteConfig },
+    appVersionProvider = PackageManagerAppVersionProvider(context.applicationContext),
+    keys = keys,
+    comparator = LaunchingStatusComparator(),
+    fetchFailureObserver = fetchFailureObserver,
+  )
+
   override suspend fun fetchAppUpdateStatus(): AppUpdateStatus {
     try {
       remoteConfigClient.fetchAndActivate()
     } catch (error: CancellationException) {
       throw error
-    } catch (_: Exception) {
-      // Continue with activated, in-app default, or Firebase static values.
+    } catch (error: Exception) {
+      notifyFetchFailure(error)
     }
 
     val releaseVersion = appVersionProvider.releaseVersion()
@@ -48,5 +74,17 @@ public class LaunchingService internal constructor(
     }
 
     return comparator.compare(releaseVersion, launching)
+  }
+
+  private fun notifyFetchFailure(error: Exception) {
+    try {
+      fetchFailureObserver.onFailure(error)
+    } catch (_: Exception) {
+      // Diagnostics must not interrupt fallback to currently available values.
+    }
+  }
+
+  private companion object {
+    private val ignoreFetchFailure = RemoteConfigFetchFailureObserver { }
   }
 }

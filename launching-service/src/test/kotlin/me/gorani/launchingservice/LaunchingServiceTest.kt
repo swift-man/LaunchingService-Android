@@ -11,6 +11,8 @@ import org.junit.Test
 class LaunchingServiceTest {
   @Test
   fun `fetch failure falls back to active values`() = runTest {
+    val fetchError = IllegalStateException("network unavailable")
+    var observedError: Throwable? = null
     val remoteConfig = FakeRemoteConfigClient(
       strings = mapOf(
         "optionalUpdateAppVersionKey" to "2.0.0",
@@ -18,11 +20,12 @@ class LaunchingServiceTest {
         "optionalUpdateAlertMessageKey" to "Update available",
         "optionalUpdateAlertDoneLinkURLKey" to "https://example.com/update",
       ),
-      fetchError = IllegalStateException("network unavailable"),
+      fetchError = fetchError,
     )
     val service = LaunchingService(
       remoteConfigClient = remoteConfig,
       appVersionProvider = AppVersionProvider { "1.0.0" },
+      fetchFailureObserver = RemoteConfigFetchFailureObserver { observedError = it },
     )
 
     val status = service.fetchAppUpdateStatus()
@@ -34,13 +37,31 @@ class LaunchingServiceTest {
       status,
     )
     assertEquals(1, remoteConfig.fetchCount)
+    assertSame(fetchError, observedError)
+  }
+
+  @Test
+  fun `observer failure does not interrupt fallback`() = runTest {
+    val service = LaunchingService(
+      remoteConfigClient = FakeRemoteConfigClient(
+        fetchError = IllegalStateException("network unavailable"),
+      ),
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+      fetchFailureObserver = RemoteConfigFetchFailureObserver {
+        throw IllegalStateException("diagnostics unavailable")
+      },
+    )
+
+    assertEquals(AppUpdateStatus.Valid, service.fetchAppUpdateStatus())
   }
 
   @Test
   fun `coroutine cancellation is never swallowed`() = runTest {
+    var observedFailureCount = 0
     val service = LaunchingService(
       remoteConfigClient = FakeRemoteConfigClient(fetchError = CancellationException()),
       appVersionProvider = AppVersionProvider { "1.0.0" },
+      fetchFailureObserver = RemoteConfigFetchFailureObserver { observedFailureCount += 1 },
     )
 
     try {
@@ -49,6 +70,7 @@ class LaunchingServiceTest {
     } catch (_: CancellationException) {
       // Expected.
     }
+    assertEquals(0, observedFailureCount)
   }
 
   @Test
