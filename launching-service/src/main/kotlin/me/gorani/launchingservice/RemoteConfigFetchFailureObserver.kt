@@ -9,5 +9,5 @@ public fun interface RemoteConfigFetchFailureObserver {
   /**
    * Called synchronously before LaunchingService falls back to the currently available values.
    */
-  public fun onFailure(error: Throwable)
+  public fun onFailure(error: Exception)
 }

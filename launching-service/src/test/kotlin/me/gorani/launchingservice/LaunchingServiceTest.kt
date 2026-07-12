@@ -12,7 +12,7 @@ class LaunchingServiceTest {
   @Test
   fun `fetch failure falls back to active values`() = runTest {
     val fetchError = IllegalStateException("network unavailable")
-    var observedError: Throwable? = null
+    var observedError: Exception? = null
     val remoteConfig = FakeRemoteConfigClient(
       strings = mapOf(
         "optionalUpdateAppVersionKey" to "2.0.0",
@@ -53,6 +53,25 @@ class LaunchingServiceTest {
     )
 
     assertEquals(AppUpdateStatus.Valid, service.fetchAppUpdateStatus())
+  }
+
+  @Test
+  fun `observer errors are never swallowed`() = runTest {
+    val observerError = AssertionError("fatal observer failure")
+    val service = LaunchingService(
+      remoteConfigClient = FakeRemoteConfigClient(
+        fetchError = IllegalStateException("network unavailable"),
+      ),
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+      fetchFailureObserver = RemoteConfigFetchFailureObserver { throw observerError },
+    )
+
+    try {
+      service.fetchAppUpdateStatus()
+      fail("Expected AssertionError")
+    } catch (error: AssertionError) {
+      assertSame(observerError, error)
+    }
   }
 
   @Test

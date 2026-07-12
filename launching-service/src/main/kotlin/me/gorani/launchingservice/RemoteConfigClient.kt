@@ -10,13 +10,15 @@ internal interface RemoteConfigClient {
 }
 
 internal class FirebaseRemoteConfigClient(
-  private val remoteConfigProvider: () -> FirebaseRemoteConfig,
+  remoteConfigProvider: () -> FirebaseRemoteConfig,
 ) : RemoteConfigClient {
+  private val remoteConfig: FirebaseRemoteConfig by lazy(remoteConfigProvider)
+
   override suspend fun fetchAndActivate() {
-    remoteConfigProvider().fetchAndActivate().await()
+    remoteConfig.fetchAndActivate().await()
   }
 
-  override fun stringValue(key: String): String = remoteConfigProvider().getString(key)
+  override fun stringValue(key: String): String = remoteConfig.getString(key)
 
-  override fun booleanValue(key: String): Boolean = remoteConfigProvider().getBoolean(key)
+  override fun booleanValue(key: String): Boolean = remoteConfig.getBoolean(key)
 }

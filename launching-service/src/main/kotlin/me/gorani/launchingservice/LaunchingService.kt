@@ -11,6 +11,7 @@ public class LaunchingService internal constructor(
   private val comparator: LaunchingStatusComparator = LaunchingStatusComparator(),
   private val fetchFailureObserver: RemoteConfigFetchFailureObserver = ignoreFetchFailure,
 ) : LaunchingServiceClient {
+  @JvmOverloads
   public constructor(
     context: Context,
     keys: RemoteConfigKeys = RemoteConfigKeys(),
@@ -21,6 +22,7 @@ public class LaunchingService internal constructor(
     comparator = LaunchingStatusComparator(),
   )
 
+  @JvmOverloads
   public constructor(
     context: Context,
     fetchFailureObserver: RemoteConfigFetchFailureObserver,
@@ -33,6 +35,7 @@ public class LaunchingService internal constructor(
     fetchFailureObserver = fetchFailureObserver,
   )
 
+  @JvmOverloads
   public constructor(
     context: Context,
     remoteConfig: FirebaseRemoteConfig,
@@ -44,6 +47,7 @@ public class LaunchingService internal constructor(
     comparator = LaunchingStatusComparator(),
   )
 
+  @JvmOverloads
   public constructor(
     context: Context,
     remoteConfig: FirebaseRemoteConfig,
