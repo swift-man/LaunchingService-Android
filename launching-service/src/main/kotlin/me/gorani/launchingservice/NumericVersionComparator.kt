@@ -6,15 +6,15 @@ internal object NumericVersionComparator {
   private val tokenPattern = Regex("\\d+|\\D+")
 
   fun compare(left: String, right: String): Int {
-    val leftComponents = left.split('.').toMutableList()
-    val rightComponents = right.split('.').toMutableList()
+    val leftComponents = left.split('.')
+    val rightComponents = right.split('.')
     val componentCount = maxOf(leftComponents.size, rightComponents.size)
 
-    while (leftComponents.size < componentCount) leftComponents += "0"
-    while (rightComponents.size < componentCount) rightComponents += "0"
-
     for (index in 0 until componentCount) {
-      val result = compareComponent(leftComponents[index], rightComponents[index])
+      val result = compareComponent(
+        leftComponents.getOrNull(index) ?: "0",
+        rightComponents.getOrNull(index) ?: "0",
+      )
       if (result != 0) return result
     }
     return 0

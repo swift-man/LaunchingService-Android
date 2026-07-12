@@ -4,6 +4,7 @@ import java.net.URI
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -62,6 +63,22 @@ class LaunchingServiceTest {
       fail("Expected InvalidAppVersion")
     } catch (_: LaunchingServiceException.InvalidAppVersion) {
       // Expected.
+    }
+  }
+
+  @Test
+  fun `missing Firebase configuration is mapped to the documented error`() = runTest {
+    val configurationError = IllegalStateException("FirebaseApp is not initialized")
+    val service = LaunchingService(
+      remoteConfigClient = FakeRemoteConfigClient(valueError = configurationError),
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+    )
+
+    try {
+      service.fetchAppUpdateStatus()
+      fail("Expected FirebaseNotConfigured")
+    } catch (error: LaunchingServiceException.FirebaseNotConfigured) {
+      assertSame(configurationError, error.cause)
     }
   }
 }

@@ -6,9 +6,9 @@ import java.util.Locale
 import java.util.TimeZone
 
 internal object Iso8601Parser {
-  private val patterns = listOf(
-    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-    "yyyy-MM-dd'T'HH:mm:ssZ",
+  private val formatters = listOf(
+    createFormatter("yyyy-MM-dd'T'HH:mm:ss.SSSZ"),
+    createFormatter("yyyy-MM-dd'T'HH:mm:ssZ"),
   )
   private val timestampPattern = Regex(
     "^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2})(?:\\.(\\d+))?(Z|[+-]\\d{2}:?\\d{2})$",
@@ -18,17 +18,21 @@ internal object Iso8601Parser {
   fun parseEpochMillis(value: String): Long? {
     val candidate = normalize(value.trim()) ?: return null
 
-    return patterns.firstNotNullOfOrNull { pattern ->
-      val formatter = SimpleDateFormat(pattern, Locale.US).apply {
-        isLenient = false
-        timeZone = TimeZone.getTimeZone("UTC")
+    return synchronized(formatters) {
+      formatters.firstNotNullOfOrNull { formatter ->
+        val position = ParsePosition(0)
+        formatter.parse(candidate, position)
+          ?.takeIf { position.index == candidate.length }
+          ?.time
       }
-      val position = ParsePosition(0)
-      formatter.parse(candidate, position)
-        ?.takeIf { position.index == candidate.length }
-        ?.time
     }
   }
+
+  private fun createFormatter(pattern: String): SimpleDateFormat =
+    SimpleDateFormat(pattern, Locale.US).apply {
+      isLenient = false
+      timeZone = TimeZone.getTimeZone("UTC")
+    }
 
   private fun normalize(value: String): String? {
     val match = timestampPattern.matchEntire(value) ?: return null
