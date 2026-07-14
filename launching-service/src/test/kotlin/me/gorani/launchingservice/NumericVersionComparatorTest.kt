@@ -34,4 +34,9 @@ class NumericVersionComparatorTest {
   fun `non-numeric tokens remain case sensitive like Apple numeric comparison`() {
     assertTrue(NumericVersionComparator.compare("1.0-RC", "1.0-rc") < 0)
   }
+
+  @Test
+  fun `non ascii digits are compared as text`() {
+    assertTrue(NumericVersionComparator.compare("１", "1") > 0)
+  }
 }

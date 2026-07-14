@@ -8,6 +8,12 @@ All notable changes to this project will be documented in this file.
 
 - Added Dokka HTML generation and deployment to the shared documentation site.
 
+### Fixed
+
+- Limited numeric version token parsing to ASCII digits so non-ASCII digits remain deterministic text tokens.
+- Cached package manager app-version lookup after the first successful read.
+- Cancelled an in-flight sample refresh before starting a new refresh request.
+
 ## [0.1.0] - 2026-07-12
 
 ### Added
