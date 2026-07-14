@@ -18,9 +18,12 @@ Run these commands after code changes:
 ./gradlew lint
 ./gradlew assembleDebug
 ./gradlew :launching-service:publishToMavenLocal
+./gradlew :launching-service:dokkaGeneratePublicationHtml
 ```
 
 Tests must not make Firebase network calls. Add regression coverage for every behavior change.
+
+Generated Dokka HTML belongs in `launching-service/build/dokka/html` and must not be committed. The `Deploy Dokka` workflow publishes that directory to the `main` branch of `swift-man/docs` under `LaunchingService-Android/`. Keep `keep_files: true` so deployments do not remove other packages. The workflow requires a `DOCS_DEPLOY_KEY` repository secret whose public key has write access to `swift-man/docs`.
 
 ## Pull Requests
 

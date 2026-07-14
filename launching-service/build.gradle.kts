@@ -1,6 +1,9 @@
+import java.net.URI
+
 plugins {
   alias(libs.plugins.android.library)
   alias(libs.plugins.maven.publish)
+  alias(libs.plugins.dokka)
 }
 
 val libraryVersion = providers.fileContents(rootProject.layout.projectDirectory.file("VERSION.txt"))
@@ -34,6 +37,29 @@ dependencies {
 
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+}
+
+dokka {
+  dokkaPublications.html {
+    moduleName.set("LaunchingService Android")
+    moduleVersion.set(libraryVersion)
+    outputDirectory.set(layout.buildDirectory.dir("dokka/html"))
+    failOnWarning.set(true)
+    includes.from(rootProject.file("README.md"))
+  }
+
+  dokkaSourceSets.configureEach {
+    sourceLink {
+      localDirectory.set(file("src/main/kotlin"))
+      remoteUrl.set(
+        URI(
+          "https://github.com/swift-man/LaunchingService-Android/" +
+            "blob/main/launching-service/src/main/kotlin",
+        ),
+      )
+      remoteLineSuffix.set("#L")
+    }
+  }
 }
 
 mavenPublishing {

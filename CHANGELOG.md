@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added Dokka HTML generation and deployment to the shared documentation site.
+
 ## [0.1.0] - 2026-07-12
 
 ### Added

@@ -5,6 +5,7 @@ review:
     - "**/*.kt"
     - "**/*.kts"
     - "**/AndroidManifest.xml"
+    - ".github/workflows/*.yml"
     - "gradle/libs.versions.toml"
     - "README.md"
 
@@ -29,3 +30,4 @@ review:
     - "settings.gradle.kts"
     - "build.gradle.kts"
     - "gradle/libs.versions.toml"
+    - ".github/workflows/deploy-dokka.yml"

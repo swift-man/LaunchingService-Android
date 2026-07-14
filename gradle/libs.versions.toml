@@ -2,6 +2,7 @@
 agp = "9.2.1"
 kotlin = "2.2.21"
 mavenPublish = "0.37.0"
+dokka = "2.2.0"
 firebaseBom = "34.16.0"
 coroutines = "1.11.0"
 androidxCore = "1.17.0"
@@ -31,3 +32,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
