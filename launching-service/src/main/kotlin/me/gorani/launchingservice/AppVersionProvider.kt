@@ -11,7 +11,11 @@ internal fun interface AppVersionProvider {
 internal class PackageManagerAppVersionProvider(
   private val context: Context,
 ) : AppVersionProvider {
-  override fun releaseVersion(): String {
+  private val cachedReleaseVersion: String by lazy { readReleaseVersion() }
+
+  override fun releaseVersion(): String = cachedReleaseVersion
+
+  private fun readReleaseVersion(): String {
     val packageInfo = try {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         context.packageManager.getPackageInfo(
