@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,7 @@ class LaunchingViewModel(
   private val launchingService: LaunchingServiceClient,
 ) : ViewModel() {
   private val mutableUiState = MutableStateFlow<LaunchingUiState>(LaunchingUiState.Loading)
+  private var refreshJob: Job? = null
   val uiState: StateFlow<LaunchingUiState> = mutableUiState.asStateFlow()
 
   init {
@@ -21,8 +23,9 @@ class LaunchingViewModel(
   }
 
   fun refresh() {
+    refreshJob?.cancel()
     mutableUiState.value = LaunchingUiState.Loading
-    viewModelScope.launch {
+    refreshJob = viewModelScope.launch {
       mutableUiState.value = try {
         LaunchingUiState.Ready(launchingService.fetchAppUpdateStatus())
       } catch (error: CancellationException) {

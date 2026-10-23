@@ -3,7 +3,7 @@ package me.gorani.launchingservice
 import java.math.BigInteger
 
 internal object NumericVersionComparator {
-  private val tokenPattern = Regex("\\d+|\\D+")
+  private val tokenPattern = Regex("[0-9]+|[^0-9]+")
 
   fun compare(left: String, right: String): Int {
     val leftComponents = left.split('.')
@@ -29,12 +29,14 @@ internal object NumericVersionComparator {
       val leftToken = leftTokens.getOrNull(index) ?: ""
       val rightToken = rightTokens.getOrNull(index) ?: ""
       val result = when {
-        leftToken.all(Char::isDigit) && rightToken.all(Char::isDigit) ->
-          BigInteger(leftToken.ifEmpty { "0" }).compareTo(BigInteger(rightToken.ifEmpty { "0" }))
+        leftToken.isAsciiDigits() && rightToken.isAsciiDigits() ->
+          BigInteger(leftToken).compareTo(BigInteger(rightToken))
         else -> leftToken.compareTo(rightToken)
       }
       if (result != 0) return result
     }
     return 0
   }
+
+  private fun String.isAsciiDigits(): Boolean = isNotEmpty() && all { it in '0'..'9' }
 }
