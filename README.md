@@ -104,14 +104,18 @@ forceUpdateAppVersionKey
 
 조건이 여러 개 일치하면 Firebase Console의 위쪽 조건이 우선합니다. 각 앱에 대한 App ID 조건을 만들고 기본값은 빈 문자열 또는 안전한 값으로 설정하세요.
 
-### Required Values
+### 필수 키 요약
 
-| Feature | Required values | Optional values |
-| --- | --- | --- |
-| Force update | `forceUpdateAppVersionKey`, absolute `forceUpdateAlertDoneLinkURLKey` | title, message |
-| Blacklist | comma-separated `blackListVersionsKey`, absolute `forceUpdateAlertDoneLinkURLKey` | title, message |
-| Optional update | `optionalUpdateAppVersionKey`, absolute `optionalUpdateAlertDoneLinkURLKey` | title, message |
-| Notice | ISO 8601 `noticeStartDateKey`, `noticeEndDateKey` with start before end | title, message, done URL, terminate flag |
+Firebase Remote Config에 사용할 기능에 맞는 다음 키를 설정합니다.
+
+| 기능 | Remote Config 키 |
+| --- | --- |
+| 강제 업데이트 | `forceUpdateAppVersionKey`, `forceUpdateAlertDoneLinkURLKey` |
+| 차단 버전 | `blackListVersionsKey`, `forceUpdateAlertDoneLinkURLKey` |
+| 선택 업데이트 | `optionalUpdateAppVersionKey`, `optionalUpdateAlertDoneLinkURLKey` |
+| 공지 | `noticeStartDateKey`, `noticeEndDateKey` |
+
+업데이트 URL은 절대 URI로 설정하고, `blackListVersionsKey`에는 차단할 버전을 쉼표로 구분해 입력합니다. 공지 시작·종료 시각은 ISO 8601 형식을 사용하며 시작 시각이 종료 시각보다 빨라야 합니다. 강제 업데이트와 차단 버전은 `forceUpdateAlertDoneLinkURLKey`를 함께 사용합니다.
 
 ### Default Keys
 
