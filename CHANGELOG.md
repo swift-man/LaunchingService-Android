@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Added Dokka HTML generation and deployment to the shared documentation site.
+- Added a `workflow_dispatch` trigger with a `tag` input to the release workflow so a failed Maven Central publication can be re-run for an existing tag.
 
 ## [0.1.0] - 2026-07-12
 
