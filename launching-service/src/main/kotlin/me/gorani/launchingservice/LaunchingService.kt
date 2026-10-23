@@ -85,21 +85,27 @@ public class LaunchingService internal constructor(
    * Runs one fetch at a time. A call that arrives while another fetch is in flight waits for
    * that fetch and reuses its outcome instead of starting a second one. Cancelling a waiting or
    * fetching call only affects that call; the next waiter then fetches on its own if needed.
+   *
+   * The failure observer is notified after the lock is released, once per failed fetch, by the
+   * call that ran that fetch. Waiting calls share the outcome without notifying again.
    */
   private suspend fun fetchAndActivateSharingInFlight() {
     val observedFetchCount = completedFetchCount
-    fetchMutex.withLock {
+    val failure = fetchMutex.withLock {
       if (completedFetchCount != observedFetchCount) return
 
-      try {
+      val failure = try {
         remoteConfigClient.fetchAndActivate()
+        null
       } catch (error: CancellationException) {
         throw error
       } catch (error: Exception) {
-        notifyFetchFailure(error)
+        error
       }
       completedFetchCount += 1
+      failure
     }
+    failure?.let(::notifyFetchFailure)
   }
 
   private fun notifyFetchFailure(error: Exception) {

@@ -61,6 +61,8 @@ val launchingService = LaunchingService(
 
 캐시 폴백을 유지하면서 네트워크 실패를 진단 시스템에 전달하려면 선택적 관찰자를 사용합니다. 관찰자에서 발생한 예외는 상태 판정을 중단하지 않습니다.
 
+`fetchAppUpdateStatus()`를 동시에 여러 번 호출하면 진행 중인 fetch 하나를 공유하므로 네트워크 요청과 관찰자 알림은 각각 한 번만 발생합니다. 호출마다 `fetchAndActivate()`를 실행하는 iOS 원본과 다른 점입니다.
+
 ```kotlin
 val launchingService = LaunchingService(
   context = applicationContext,
