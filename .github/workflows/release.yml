@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to publish, for example v0.1.0. Must equal v$(cat VERSION.txt) at that tag."
+        description: "Existing release tag to publish, for example v0.1.0. Leave empty to publish the tag the run was started on."
         required: false
         default: ""
         type: string
@@ -19,26 +19,24 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
     steps:
-      - name: Require tag input for manual runs
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          if [ -z "${RELEASE_TAG}" ]; then
-            echo "::error::The 'tag' input is required for manual runs, for example: gh workflow run release.yml -f tag=v0.1.0"
-            exit 1
-          fi
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify release version
-        run: test "${RELEASE_TAG}" = "v$(tr -d '[:space:]' < VERSION.txt)"
+        run: |
+          expected="v$(tr -d '[:space:]' < VERSION.txt)"
+          if [ "${RELEASE_TAG}" != "${expected}" ]; then
+            echo "::error::Release tag '${RELEASE_TAG}' does not match VERSION.txt ('${expected}'). Start the run on the release tag or pass it as the 'tag' input."
+            exit 1
+          fi
       - name: Test and build
         run: ./gradlew test lint assembleRelease
       - name: Publish to Maven Central

@@ -203,13 +203,13 @@ The release tag must equal `v$(cat VERSION.txt)`.
 
 ### Manual Re-run
 
-The workflow also accepts `workflow_dispatch` with a `tag` input, so a failed publication (for example, a run that failed at `signMavenPublication` because the signing secrets were missing) can be retried without creating a new release. A manual run checks out that tag and applies the same `v$(cat VERSION.txt)` check, so it publishes only when the tag matches `VERSION.txt` at that tag. After registering all four secrets above, republish `v0.1.0` with:
+The workflow also accepts `workflow_dispatch`, so a failed publication (for example, a run that failed at `signMavenPublication` because the signing secrets were missing) can be retried without creating a new release. A manual run publishes only when the resolved tag equals `v$(cat VERSION.txt)`; the tag comes from the optional `tag` input, or, when that is empty, from the ref the run was started on. Starting the run on a branch therefore fails the version check and publishes nothing. After registering all four secrets above, republish `v0.1.0` from `main` with:
 
 ```bash
 gh workflow run release.yml -f tag=v0.1.0
 ```
 
-Alternatively, open the release on GitHub, convert it to a draft, and publish it again; that fires the `release: published` trigger with the same checks.
+Tags created after this trigger was added can also be published by starting the run directly on the tag ref (`gh workflow run release.yml --ref v0.2.0`), which suits dispatchers that cannot pass inputs. That does not work for `v0.1.0`, because the workflow file at that tag has no `workflow_dispatch` trigger. Alternatively, open the release on GitHub, convert it to a draft, and publish it again; that fires the `release: published` trigger with the same checks.
 
 ## License
 
