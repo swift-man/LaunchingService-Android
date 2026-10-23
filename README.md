@@ -201,6 +201,16 @@ GitHub Releases trigger Maven Central publication. The repository requires these
 
 The release tag must equal `v$(cat VERSION.txt)`.
 
+### Manual Re-run
+
+The workflow also accepts `workflow_dispatch` with a `tag` input, so a failed publication (for example, a run that failed at `signMavenPublication` because the signing secrets were missing) can be retried without creating a new release. A manual run checks out that tag and applies the same `v$(cat VERSION.txt)` check, so it publishes only when the tag matches `VERSION.txt` at that tag. After registering all four secrets above, republish `v0.1.0` with:
+
+```bash
+gh workflow run release.yml -f tag=v0.1.0
+```
+
+Alternatively, open the release on GitHub, convert it to a draft, and publish it again; that fires the `release: published` trigger with the same checks.
+
 ## License
 
 MIT License. See [LICENSE](LICENSE).
