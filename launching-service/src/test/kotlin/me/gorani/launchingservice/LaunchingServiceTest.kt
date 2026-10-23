@@ -2,12 +2,20 @@ package me.gorani.launchingservice
 
 import java.net.URI
 import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LaunchingServiceTest {
   @Test
   fun `fetch failure falls back to active values`() = runTest {
@@ -121,5 +129,148 @@ class LaunchingServiceTest {
     } catch (error: LaunchingServiceException.FirebaseNotConfigured) {
       assertSame(configurationError, error.cause)
     }
+  }
+
+  @Test
+  fun `concurrent calls share one in-flight fetch`() = runTest {
+    val fetchGate = CompletableDeferred<Unit>()
+    val remoteConfig = FakeRemoteConfigClient(fetchGate = fetchGate)
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+    )
+
+    val first = async { service.fetchAppUpdateStatus() }
+    val second = async { service.fetchAppUpdateStatus() }
+    runCurrent()
+    assertEquals(1, remoteConfig.fetchCount)
+
+    fetchGate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(AppUpdateStatus.Valid, first.await())
+    assertEquals(AppUpdateStatus.Valid, second.await())
+    assertEquals(1, remoteConfig.fetchCount)
+  }
+
+  @Test
+  fun `calls after a completed fetch start a new fetch`() = runTest {
+    val remoteConfig = FakeRemoteConfigClient()
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+    )
+
+    service.fetchAppUpdateStatus()
+    service.fetchAppUpdateStatus()
+
+    assertEquals(2, remoteConfig.fetchCount)
+  }
+
+  @Test
+  fun `cancelling one call does not break a concurrent call`() = runTest {
+    val fetchGate = CompletableDeferred<Unit>()
+    val remoteConfig = FakeRemoteConfigClient(fetchGate = fetchGate)
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+    )
+
+    val first = async { service.fetchAppUpdateStatus() }
+    val second = async { service.fetchAppUpdateStatus() }
+    runCurrent()
+    assertEquals(1, remoteConfig.fetchCount)
+
+    first.cancel()
+    runCurrent()
+    assertTrue(first.isCancelled)
+
+    fetchGate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(AppUpdateStatus.Valid, second.await())
+    assertEquals(2, remoteConfig.fetchCount)
+  }
+
+  @Test
+  fun `concurrent calls share one failed fetch and notify the observer once`() = runTest {
+    val fetchGate = CompletableDeferred<Unit>()
+    val remoteConfig = FakeRemoteConfigClient(
+      strings = mapOf(
+        "optionalUpdateAppVersionKey" to "2.0.0",
+        "optionalUpdateAlertTitleKey" to "Optional",
+        "optionalUpdateAlertMessageKey" to "Update available",
+        "optionalUpdateAlertDoneLinkURLKey" to "https://example.com/update",
+      ),
+      fetchError = IllegalStateException("network unavailable"),
+      fetchGate = fetchGate,
+    )
+    var observedFailureCount = 0
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+      fetchFailureObserver = RemoteConfigFetchFailureObserver { observedFailureCount += 1 },
+    )
+    val fallback = AppUpdateStatus.OptionalUpdateRequired(
+      UpdateAlert("Optional", "Update available", URI("https://example.com/update")),
+    )
+
+    val first = async { service.fetchAppUpdateStatus() }
+    val second = async { service.fetchAppUpdateStatus() }
+    runCurrent()
+    assertEquals(1, remoteConfig.fetchCount)
+
+    fetchGate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(fallback, first.await())
+    assertEquals(fallback, second.await())
+    assertEquals(1, remoteConfig.fetchCount)
+    assertEquals(1, observedFailureCount)
+  }
+
+  @Test
+  fun `failed fetch is not cached for later calls`() = runTest {
+    val remoteConfig = FakeRemoteConfigClient(
+      fetchError = IllegalStateException("network unavailable"),
+    )
+    var observedFailureCount = 0
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+      fetchFailureObserver = RemoteConfigFetchFailureObserver { observedFailureCount += 1 },
+    )
+
+    assertEquals(AppUpdateStatus.Valid, service.fetchAppUpdateStatus())
+    assertEquals(AppUpdateStatus.Valid, service.fetchAppUpdateStatus())
+
+    assertEquals(2, remoteConfig.fetchCount)
+    assertEquals(2, observedFailureCount)
+  }
+
+  @Test
+  fun `observer may call back into the service without deadlocking`() = runTest {
+    val remoteConfig = FakeRemoteConfigClient(
+      fetchError = IllegalStateException("network unavailable"),
+    )
+    var observedFailureCount = 0
+    lateinit var service: LaunchingService
+    var reentrantStatus: AppUpdateStatus? = null
+    service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+      fetchFailureObserver = RemoteConfigFetchFailureObserver {
+        observedFailureCount += 1
+        if (observedFailureCount == 1) {
+          reentrantStatus = runBlocking { service.fetchAppUpdateStatus() }
+        }
+      },
+    )
+
+    assertEquals(AppUpdateStatus.Valid, service.fetchAppUpdateStatus())
+
+    assertEquals(AppUpdateStatus.Valid, reentrantStatus)
+    assertEquals(2, remoteConfig.fetchCount)
+    assertEquals(2, observedFailureCount)
   }
 }

@@ -3,6 +3,8 @@ package me.gorani.launchingservice
 import android.content.Context
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 public class LaunchingService internal constructor(
   private val remoteConfigClient: RemoteConfigClient,
@@ -17,7 +19,7 @@ public class LaunchingService internal constructor(
     keys: RemoteConfigKeys = RemoteConfigKeys(),
   ) : this(
     remoteConfigClient = FirebaseRemoteConfigClient(FirebaseRemoteConfig::getInstance),
-    appVersionProvider = PackageManagerAppVersionProvider(context.applicationContext),
+    appVersionProvider = defaultAppVersionProvider(context),
     keys = keys,
     comparator = LaunchingStatusComparator(),
   )
@@ -29,7 +31,7 @@ public class LaunchingService internal constructor(
     keys: RemoteConfigKeys = RemoteConfigKeys(),
   ) : this(
     remoteConfigClient = FirebaseRemoteConfigClient(FirebaseRemoteConfig::getInstance),
-    appVersionProvider = PackageManagerAppVersionProvider(context.applicationContext),
+    appVersionProvider = defaultAppVersionProvider(context),
     keys = keys,
     comparator = LaunchingStatusComparator(),
     fetchFailureObserver = fetchFailureObserver,
@@ -42,7 +44,7 @@ public class LaunchingService internal constructor(
     keys: RemoteConfigKeys = RemoteConfigKeys(),
   ) : this(
     remoteConfigClient = FirebaseRemoteConfigClient { remoteConfig },
-    appVersionProvider = PackageManagerAppVersionProvider(context.applicationContext),
+    appVersionProvider = defaultAppVersionProvider(context),
     keys = keys,
     comparator = LaunchingStatusComparator(),
   )
@@ -55,20 +57,19 @@ public class LaunchingService internal constructor(
     keys: RemoteConfigKeys = RemoteConfigKeys(),
   ) : this(
     remoteConfigClient = FirebaseRemoteConfigClient { remoteConfig },
-    appVersionProvider = PackageManagerAppVersionProvider(context.applicationContext),
+    appVersionProvider = defaultAppVersionProvider(context),
     keys = keys,
     comparator = LaunchingStatusComparator(),
     fetchFailureObserver = fetchFailureObserver,
   )
 
+  private val fetchMutex = Mutex()
+
+  @Volatile
+  private var completedFetchCount = 0L
+
   override suspend fun fetchAppUpdateStatus(): AppUpdateStatus {
-    try {
-      remoteConfigClient.fetchAndActivate()
-    } catch (error: CancellationException) {
-      throw error
-    } catch (error: Exception) {
-      notifyFetchFailure(error)
-    }
+    fetchAndActivateSharingInFlight()
 
     val releaseVersion = appVersionProvider.releaseVersion()
     val launching = try {
@@ -78,6 +79,33 @@ public class LaunchingService internal constructor(
     }
 
     return comparator.compare(releaseVersion, launching)
+  }
+
+  /**
+   * Runs one fetch at a time. A call that arrives while another fetch is in flight waits for
+   * that fetch and reuses its outcome instead of starting a second one. Cancelling a waiting or
+   * fetching call only affects that call; the next waiter then fetches on its own if needed.
+   *
+   * The failure observer is notified after the lock is released, once per failed fetch, by the
+   * call that ran that fetch. Waiting calls share the outcome without notifying again.
+   */
+  private suspend fun fetchAndActivateSharingInFlight() {
+    val observedFetchCount = completedFetchCount
+    val failure = fetchMutex.withLock {
+      if (completedFetchCount != observedFetchCount) return
+
+      val failure = try {
+        remoteConfigClient.fetchAndActivate()
+        null
+      } catch (error: CancellationException) {
+        throw error
+      } catch (error: Exception) {
+        error
+      }
+      completedFetchCount += 1
+      failure
+    }
+    failure?.let(::notifyFetchFailure)
   }
 
   private fun notifyFetchFailure(error: Exception) {
@@ -90,5 +118,8 @@ public class LaunchingService internal constructor(
 
   private companion object {
     private val ignoreFetchFailure = RemoteConfigFetchFailureObserver { }
+
+    private fun defaultAppVersionProvider(context: Context): AppVersionProvider =
+      CachingAppVersionProvider(PackageManagerAppVersionProvider(context.applicationContext))
   }
 }
