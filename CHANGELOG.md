@@ -9,11 +9,16 @@ All notable changes to this project will be documented in this file.
 - Added Dokka HTML generation and deployment to the shared documentation site.
 - Added a `workflow_dispatch` trigger with a `tag` input to the release workflow so a failed Maven Central publication can be re-run for an existing tag.
 
+### Changed
+
+- A trailing numeric token now sorts after its absent counterpart, so `1.0-beta0` is newer than `1.0-beta` instead of equal to it.
+
 ### Fixed
 
 - Limited numeric version token parsing to ASCII digits so non-ASCII digits remain deterministic text tokens.
 - Cached package manager app-version lookup after the first successful read.
 - Cancelled an in-flight sample refresh before starting a new refresh request.
+- Shared one in-flight Remote Config fetch between concurrent `fetchAppUpdateStatus()` calls instead of fetching once per call.
 
 ## [0.1.0] - 2026-07-12
 

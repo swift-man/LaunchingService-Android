@@ -39,4 +39,9 @@ class NumericVersionComparatorTest {
   fun `non ascii digits are compared as text`() {
     assertTrue(NumericVersionComparator.compare("１", "1") > 0)
   }
+
+  @Test
+  fun `trailing numeric token sorts after its absent counterpart`() {
+    assertTrue(NumericVersionComparator.compare("1.0-beta0", "1.0-beta") > 0)
+  }
 }

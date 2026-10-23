@@ -2,11 +2,19 @@ package me.gorani.launchingservice
 
 import java.net.URI
 import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
 
 class LaunchingServiceTest {
   @Test
@@ -121,5 +129,66 @@ class LaunchingServiceTest {
     } catch (error: LaunchingServiceException.FirebaseNotConfigured) {
       assertSame(configurationError, error.cause)
     }
+  }
+
+  @Test
+  fun `concurrent calls share one in-flight fetch`() = runTest {
+    val fetchGate = CompletableDeferred<Unit>()
+    val remoteConfig = FakeRemoteConfigClient(fetchGate = fetchGate)
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+    )
+
+    val first = async { service.fetchAppUpdateStatus() }
+    val second = async { service.fetchAppUpdateStatus() }
+    runCurrent()
+    assertEquals(1, remoteConfig.fetchCount)
+
+    fetchGate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(AppUpdateStatus.Valid, first.await())
+    assertEquals(AppUpdateStatus.Valid, second.await())
+    assertEquals(1, remoteConfig.fetchCount)
+  }
+
+  @Test
+  fun `calls after a completed fetch start a new fetch`() = runTest {
+    val remoteConfig = FakeRemoteConfigClient()
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+    )
+
+    service.fetchAppUpdateStatus()
+    service.fetchAppUpdateStatus()
+
+    assertEquals(2, remoteConfig.fetchCount)
+  }
+
+  @Test
+  fun `cancelling one call does not break a concurrent call`() = runTest {
+    val fetchGate = CompletableDeferred<Unit>()
+    val remoteConfig = FakeRemoteConfigClient(fetchGate = fetchGate)
+    val service = LaunchingService(
+      remoteConfigClient = remoteConfig,
+      appVersionProvider = AppVersionProvider { "1.0.0" },
+    )
+
+    val first = async { service.fetchAppUpdateStatus() }
+    val second = async { service.fetchAppUpdateStatus() }
+    runCurrent()
+    assertEquals(1, remoteConfig.fetchCount)
+
+    first.cancel()
+    runCurrent()
+    assertTrue(first.isCancelled)
+
+    fetchGate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(AppUpdateStatus.Valid, second.await())
+    assertEquals(2, remoteConfig.fetchCount)
   }
 }
