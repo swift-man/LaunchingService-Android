@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+# A published release and a manual run for the same tag publish one at a time.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -22,6 +27,23 @@ jobs:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
     steps:
+      - name: Verify publishing secrets
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_SIGNING_KEY: ${{ secrets.MAVEN_SIGNING_KEY }}
+          MAVEN_SIGNING_PASSWORD: ${{ secrets.MAVEN_SIGNING_PASSWORD }}
+        run: |
+          missing=""
+          for name in MAVEN_CENTRAL_USERNAME MAVEN_CENTRAL_PASSWORD MAVEN_SIGNING_KEY MAVEN_SIGNING_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              missing="${missing} ${name}"
+            fi
+          done
+          if [ -n "${missing}" ]; then
+            echo "::error::Missing repository secrets:${missing}. Register them before publishing; nothing was uploaded."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
